@@ -2,6 +2,11 @@
 
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
+## [0.3.0] — 2026-10-20
+### Adicionado
+- `references/honeypot.md`: padrão de honeypot defensivo (campo, rota, endpoint-isca com fake 201 sem efeito real, credencial-canário), captura por comportamento e nunca por país, bloqueio com TTL, evento `honeypot.hit`, LGPD e testes.
+- Gate `scripts/check-honeypot.sh` (+ teste) que valida o `honeypots.yml` e proíbe bloqueio por país.
+
 
 ## [0.2.1] — 2026-10-14
 Ponteiro para a skill nova `schematize-bots` (piso curto, sem duplicar).

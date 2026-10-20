@@ -67,6 +67,7 @@ vira tema sem dono — e sem dono, ninguém lê o alerta que disparou às 3h.
 
 1. **Rode os gates antes de discutir estilo:**
    `bash scripts/check-otel-collector.sh <config.yaml|dir>` e `node scripts/check-alertas.mjs <regras.yaml|dir>`
+   (e `bash scripts/check-honeypot.sh [--routes inventario.txt] honeypots.yml` se houver honeypot)
    — `0` passa · `1` reprova · `2` **nada para verificar** (que não é aprovação).
 2. **Leia o padrão** (`references/padrao-otel.md`), depois o sinal em questão.
 3. **Copie o ponto de partida** de `assets/` (Collector, regras de SLO, convenção de log, exemplo da sua linguagem).
@@ -82,6 +83,7 @@ vira tema sem dono — e sem dono, ninguém lê o alerta que disparou às 3h.
 | Liveness != readiness != startup | `references/healthchecks.md` |
 | Stack self-hosted, justificativa, segurança, retenção e custo | `references/stack-referencia.md` |
 | Não-prd: separação por ambiente, piso de efeito externo, teste de observabilidade | `references/ambientes.md` |
+| Honeypot defensivo: iscas, FAKE 201, score, contenção com TTL, LGPD, teste (gate `check-honeypot.sh`) | `references/honeypot.md` |
 | Fronteiras com front (RUM) e LLM | `references/front-llm.md` |
 | Versões, estabilidade dos sinais, fontes (anexo volátil) | `references/stack-versoes.md` |
 
