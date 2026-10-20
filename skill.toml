@@ -3,7 +3,7 @@ name = "schematize-observability"
 tag = "Domínio · Observabilidade"
 status = "beta"
 order = 35
-current_version = "0.2.1"
+current_version = "0.3.0"
 href = "/observability"
 
 [descriptions]

@@ -1,0 +1,12 @@
+slug = "observability"
+name = "schematize-observability"
+tag = "Domínio · Observabilidade"
+status = "beta"
+order = 35
+current_version = "0.3.0"
+href = "/observability"
+
+[descriptions]
+pt = "A dona da observabilidade da casa: OpenTelemetry (SDK + Collector, OTLP, semconv), traces, métricas e logs correlacionados por trace_id, cardinalidade e amostragem, SLO com alertas multi-burn-rate e runbook, dashboards como código, healthchecks e a stack self-hosted — com gates executáveis."
+en = "The house's observability owner: OpenTelemetry (SDK + Collector, OTLP, semconv), traces, metrics and logs correlated by trace_id, cardinality and sampling, SLOs with multi-burn-rate alerts and runbooks, dashboards as code, healthchecks and the self-hosted stack — with executable gates."
+es = "La dueña de la observabilidad de la casa: OpenTelemetry (SDK + Collector, OTLP, semconv), trazas, métricas y logs correlacionados por trace_id, cardinalidad y muestreo, SLO con alertas multi-burn-rate y runbook, dashboards como código, healthchecks y la stack self-hosted — con gates ejecutables."

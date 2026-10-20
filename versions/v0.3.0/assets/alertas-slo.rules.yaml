@@ -1,0 +1,118 @@
+# alertas-slo.rules.yaml — SLO de disponibilidade com alerta multi-window multi-burn-rate.
+# Exemplo: SLO 99,9% em 30 dias (error budget 0,1% = 0.001). Fonte do método: Google SRE Workbook,
+# "Alerting on SLOs" (cap. 5). Fatores de burn: 14.4 (1h+5m, consome 2% do budget em 1h),
+# 6 (6h+30m, 5%), 3 (1d+2h, 10%) e 1 (3d+6h, 10%) — os 2 primeiros PAGINAM, os 2 últimos abrem ticket.
+# Pré-requisito: SLI como recording rules (abaixo), sobre a métrica semconv http.server.request.duration
+# exportada ao Prometheus como http_server_request_duration_seconds_*. SEM label de alta cardinalidade:
+# agregamos por service e descartamos o resto.
+groups:
+  - name: sli-disponibilidade
+    interval: 30s
+    rules:
+      # razão de erro (5xx) por janela; a rota (http.route, baixa cardinalidade) NÃO entra no SLI global.
+      - record: service:http_errors:ratio_rate5m
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+      - record: service:http_errors:ratio_rate30m
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[30m]))
+      - record: service:http_errors:ratio_rate1h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[1h]))
+      - record: service:http_errors:ratio_rate2h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[2h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[2h]))
+      - record: service:http_errors:ratio_rate6h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[6h]))
+      - record: service:http_errors:ratio_rate1d
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1d]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[1d]))
+      - record: service:http_errors:ratio_rate3d
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[3d]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[3d]))
+
+  - name: slo-disponibilidade-burn-rate
+    rules:
+      # PÁGINA: queima 14.4x o budget; janela longa 1h confirma, curta 5m garante que ainda está queimando.
+      - alert: SLOBurnRateAltoPagina
+        expr: |
+          service:http_errors:ratio_rate1h > (14.4 * 0.001)
+          and
+          service:http_errors:ratio_rate5m > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: page
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 14.4x (1h e 5m)"
+          description: "Sintoma de usuário: erro 5xx acima de 1.44% nas duas janelas. Budget de 30d acaba em ~2 dias."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-alto"
+      # PÁGINA: 6x em 6h + 30m.
+      - alert: SLOBurnRateMedioPagina
+        expr: |
+          service:http_errors:ratio_rate6h > (6 * 0.001)
+          and
+          service:http_errors:ratio_rate30m > (6 * 0.001)
+        for: 5m
+        labels:
+          severity: page
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 6x (6h e 30m)"
+          description: "Erro 5xx acima de 0.6% sustentado. Budget de 30d acaba em ~5 dias."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-medio"
+      # TICKET: 3x em 1d + 2h.
+      - alert: SLOBurnRateLentoTicket
+        expr: |
+          service:http_errors:ratio_rate1d > (3 * 0.001)
+          and
+          service:http_errors:ratio_rate2h > (3 * 0.001)
+        for: 15m
+        labels:
+          severity: ticket
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 3x (1d e 2h)"
+          description: "Degradação lenta: abrir ticket e priorizar confiabilidade antes que vire página."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-lento"
+      # TICKET: 1x em 3d + 6h (consumo no ritmo exato do budget: só avisa).
+      - alert: SLOBurnRateBaseTicket
+        expr: |
+          service:http_errors:ratio_rate3d > (1 * 0.001)
+          and
+          service:http_errors:ratio_rate6h > (1 * 0.001)
+        for: 30m
+        labels:
+          severity: ticket
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} consome o budget no ritmo limite (3d e 6h)"
+          description: "Sem folga: qualquer incidente a mais estoura o SLO do período."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-base"
+
+  - name: sintomas-de-usuario
+    rules:
+      # Readiness caindo tira instância do tráfego: sintoma que o usuário sente quando é o fleet inteiro.
+      - alert: ServicoSemInstanciaPronta
+        expr: sum by (service_name) (up{job=~".+"}) == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }} sem nenhuma instância respondendo"
+          runbook_url: "https://docs.exemplo.interno/runbooks/sem-instancia"
