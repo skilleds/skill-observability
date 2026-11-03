@@ -77,3 +77,23 @@ lugar de quantil; métrica criada em loop com nome dinâmico; counter que reinic
 tratar; gauge de "último valor" usado como contador.
 
 Métricas de bot de chat (latência de ack, 429, shard caído): o que medir em `schematize-bots → references/prazo-fila-rate-limit.md`.
+
+## 8. Fila e resiliência (piso 28)
+
+Todo microserviço com fila de espera durável (outbox/inbox em DB/Redis), retry e DLQ exporta, por
+`service_name` e `queue` (valores de conjunto pequeno e fixo):
+
+| Métrica | Tipo | Alerta (`assets/alertas-slo.rules.yaml`, grupo `fila-e-resiliencia`) |
+|---|---|---|
+| `queue_depth` | gauge | `FilaProfundidadeAlta`: alta **e** crescendo (`deriv`), ticket |
+| `queue_oldest_item_age_seconds` | gauge | `FilaItemMaisAntigoVelho`: idade acima do SLO de frescor, página |
+| `queue_dlq_depth` | gauge | `DLQComItem`: `> 0`, página (envenenado exige humano) |
+| `outbox_lag_seconds` | gauge | `OutboxLagAlto`: evento gravado e não publicado há mais que o orçamento, página |
+| `queue_retries_total`, `queue_processed_total` | counter | taxa de reprocesso e vazão, para o painel |
+
+- **Alerta com `trace_id`:** `trace_id` nunca é label (§3). O item que foi para a fila ou DLQ loga
+  `queue.enqueued`/`queue.retry`/`dlq.enter`/`outbox.publish_failed` com `trace_id` e `queue`; o alerta
+  carrega a annotation `trace_lookup` com a consulta pronta (LogQL) e, quando houver, o exemplar leva ao trace.
+- Os limiares do asset (1000, 900 s, 60 s) são **exemplo**: ajuste ao orçamento do serviço e registre no `/docs/slo.md`.
+- Fila vazia por métrica ausente não é saudável: alerte também a **ausência** da série (`absent()`) para o serviço que declara fila.
+- O teste de resiliência do piso 28 (item 2: dependência fora vira fila, serviço segue vivo) deve afirmar que a métrica sobe.

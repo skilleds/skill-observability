@@ -25,3 +25,5 @@ Sistema que você não enxerga, você não opera. Observabilidade nasce **com** 
 Gates: `bash .claude/skills/schematize-observability/scripts/check-otel-collector.sh <config>` ·
 `node .claude/skills/schematize-observability/scripts/check-alertas.mjs <regras>` — waiver
 rastreável `# obs-ok: <motivo>`.
+
+Herda os pisos 22–29 da `schematize-engineering` (git como trava de conclusão, deploy só do git, ops é o gate da IA, sem agents inúteis, relatório 30 min/handoff 6 h, CI remoto só antes do hml, microserviço autônomo, build em dev/hml + higiene).

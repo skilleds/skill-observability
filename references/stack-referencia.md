@@ -8,13 +8,13 @@
 | Camada | Escolha da casa | Por quê | Alternativa aceita (com ADR) |
 |---|---|---|---|
 | Instrumentação | **OpenTelemetry SDK** por linguagem | padrão aberto, neutro de vendor, mesma API em todo o rol | — (SDK de vendor: vetado) |
-| Coleta/política | **OpenTelemetry Collector (contrib)** | redaction, amostragem de cauda e roteamento num lugar só; config é o contrato | **Grafana Alloy** (distribuição que embute componentes do Collector); a base cita Alloy — equivalente |
+| Coleta/política | **OpenTelemetry Collector (contrib)** | redaction, amostragem de cauda e roteamento num lugar só; config é o contrato | **Grafana Alloy** (distribuição que embute componentes do Collector); a base cita Alloy — equivalente; decisão registrada pela `adr-modelo-collector-vs-alloy.md` |
 | Métricas | **Prometheus** (curto prazo/scrape) + **Mimir** (longo prazo, HA, multi-tenant) | PromQL, ecossistema de alertas; Mimir escala e isola tenants | **VictoriaMetrics** (single-node ou cluster) quando a escala é pequena/média: um binário, menos peças, PromQL-compatível **[volátil]** |
 | Logs | **Loki** | indexa só labels (barato), consulta LogQL, recebe OTLP | VictoriaLogs; **ClickHouse**-based (SigNoz, OpenObserve) **[volátil]** |
 | Traces | **Tempo** | armazenamento em objeto, barato, TraceQL, liga a métrica/log | Jaeger (v2 é Collector) **[volátil]** |
 | Profiles | **Pyroscope** | profiling contínuo integrado ao Grafana | Parca |
 | Visualização/alerta | **Grafana** (+ Alertmanager ou alerta do Grafana) | um painel para os 4 sinais, exemplar -> trace -> log -> perfil | — |
-| Entrega | chart/IaC **versionado por serviço**, com dashboard e regras | um serviço só está pronto se sobe com o seu (`engineering` §16) | — |
+| Entrega | chart/IaC **versionado por serviço**, com dashboard e regras (chart Helm/IaC da própria stack: `[~]` pendente, ver CHANGELOG) | um serviço só está pronto se sobe com o seu (`engineering` §16) | — |
 
 **Por que self-hosted:** dado de telemetria carrega o que a casa mais protege (identificadores,
 payloads quando algo escapa à redaction), custo previsível, sem lock-in de preço por GB/série, e o

@@ -2,6 +2,18 @@
 
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
+## [Não lançado]
+### Adicionado
+- `metricas.md` §8 "Fila e resiliência" (piso 28) e grupo `fila-e-resiliencia` em `assets/alertas-slo.rules.yaml`: `FilaProfundidadeAlta`, `FilaItemMaisAntigoVelho`, `DLQComItem`, `OutboxLagAlto`, com `trace_lookup` (alerta com `trace_id` via log/exemplar, nunca label) (P1-20).
+- `scripts/alertas-fila.test.sh`: valida o yaml (gate verde, 4 alertas completos, vermelho plantado sem DLQ) e a tabela de sinais.
+- `references/leitura-ia-ops.md` + `assets/sinal-operacao-ops.json`: tabela sinal -> operação do ops, machine-readable; a IA lê telemetria só por operação do ops (piso 24) (P1-22).
+- `references/adr-modelo-collector-vs-alloy.md`: ADR-modelo para registrar a escolha Collector contrib vs Alloy (P1-21).
+- Bloco herdado dos pisos 22–29 em `SKILL.md` e `assets/CLAUDE.md`.
+
+### Pendente (on-hold)
+- `[~]` P1-21: chart Helm/IaC da stack de observabilidade não é trivial (depende da IaC por projeto, `schematize-infra`/`schematize-terraform`); fica para rodada própria.
+- `[~]` P2-8: `honeypot.md` + `check-honeypot.sh` talvez devam migrar para `schematize-pentest` ou skill de defesa ativa, e o cruzamento `honeypots.yml` x matriz de rotas (`--routes`) tornar-se obrigatório; decisão de ownership é do usuário.
+
 ## [0.3.0] — 2026-10-20
 ### Adicionado
 - `references/honeypot.md`: padrão de honeypot defensivo (campo, rota, endpoint-isca com fake 201 sem efeito real, credencial-canário), captura por comportamento e nunca por país, bloqueio com TTL, evento `honeypot.hit`, LGPD e testes.

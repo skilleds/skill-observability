@@ -84,6 +84,9 @@ vira tema sem dono — e sem dono, ninguém lê o alerta que disparou às 3h.
 | Stack self-hosted, justificativa, segurança, retenção e custo | `references/stack-referencia.md` |
 | Não-prd: separação por ambiente, piso de efeito externo, teste de observabilidade | `references/ambientes.md` |
 | Honeypot defensivo: iscas, FAKE 201, score, contenção com TTL, LGPD, teste (gate `check-honeypot.sh`) | `references/honeypot.md` |
+| Fila, DLQ e outbox: métricas e alertas do piso 28 (grupo `fila-e-resiliencia`) | `references/metricas.md` §8 |
+| Como a IA lê telemetria: só por operação do ops (piso 24), tabela sinal -> operação | `references/leitura-ia-ops.md` · `assets/sinal-operacao-ops.json` |
+| ADR-modelo Collector vs Alloy | `references/adr-modelo-collector-vs-alloy.md` |
 | Fronteiras com front (RUM) e LLM | `references/front-llm.md` |
 | Versões, estabilidade dos sinais, fontes (anexo volátil) | `references/stack-versoes.md` |
 
@@ -114,6 +117,8 @@ Assets prontos para copiar: `assets/otel-collector.yaml` · `assets/alertas-slo.
 11. **Ambiente separado:** telemetria de dev/hml jamais vai para backend ou SaaS de prd; hml não acorda ninguém.
 12. **Retenção e custo definidos por tipo**, cobrados por serviço; stack com TLS entre componentes.
 13. <!-- herdado:engineering/orquestracao:bullet -->**Orquestrador não desenvolve; subagent barato executa** (`schematize-engineering` → `references/orquestracao.md` §9). O principal só planeja/decompõe/despacha/supervisiona/revisa; ação onerosa vira micro-tasks; principal = Claude Opus; executor mais barato que resolve: `haiku` (mecânico) / `sonnet` (código, até 2 rodadas de correção pelo mesmo subagent) → Codex `gpt-5.6-terra` → Cursor → subagent `opus` (motivo no checkpoint) → `park`; **visual direto ao Codex; imagem nunca pelo Claude (pergunta ao usuário: Codex sugerido, ou Gemini), API de imagem paga PROIBIDA**; papéis configuráveis em `agentes.toml` (aba "Agentes" do overdev). No `overdev`, cada item do checklist é executado pelo papel adequado e revisado pelo principal (diff + gate) antes do `- [x]`. **Sem frota ociosa:** agent idle com pendência executável volta ao trabalho; pendência que depende de outro agent → mata e enfileira com gatilho de dependência; terminou → mata (§9.6).<!-- /herdado -->
+
+Herda os pisos 22–29 da `schematize-engineering` (git como trava de conclusão, deploy só do git, ops é o gate da IA, sem agents inúteis, relatório 30 min/handoff 6 h, CI remoto só antes do hml, microserviço autônomo, build em dev/hml + higiene).
 
 ## Fronteiras com outras skills
 
