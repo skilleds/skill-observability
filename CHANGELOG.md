@@ -2,7 +2,7 @@
 
 Todas as mudanças relevantes deste pacote, no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 com versionamento [SemVer](https://semver.org/lang/pt-BR/).
-## [Não lançado]
+## [0.4.0] — 2026-11-03
 ### Adicionado
 - `metricas.md` §8 "Fila e resiliência" (piso 28) e grupo `fila-e-resiliencia` em `assets/alertas-slo.rules.yaml`: `FilaProfundidadeAlta`, `FilaItemMaisAntigoVelho`, `DLQComItem`, `OutboxLagAlto`, com `trace_lookup` (alerta com `trace_id` via log/exemplar, nunca label) (P1-20).
 - `scripts/alertas-fila.test.sh`: valida o yaml (gate verde, 4 alertas completos, vermelho plantado sem DLQ) e a tabela de sinais.
