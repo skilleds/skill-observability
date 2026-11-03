@@ -1,0 +1,113 @@
+# otel-collector.yaml — Collector de referência da casa (schematize-observability).
+# Distribuição: opentelemetry-collector-contrib v0.162.0 (verificado em 2026-10-14; ver
+# references/stack-versoes.md). Um Collector por ambiente; ESTE arquivo é o de prd.
+# hml/dev usam os MESMOS processors e exporters que apontem para o backend DAQUELE ambiente
+# (nunca o de prd, nunca SaaS de prd) — ver references/ambientes.md.
+# Ordem dos processors importa: memory_limiter PRIMEIRO, redaction antes de qualquer exporter,
+# amostragem antes do batch (batch por último).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317        # dentro do container/pod; exponha só na rede interna
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 1) proteção do próprio Collector: sem isto ele morre por OOM no pico e leva a telemetria junto.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  # 2) redaction: PII e segredo saem aqui mesmo que a aplicação tenha falhado em mascarar.
+  #    Defesa em profundidade — a aplicação mascara na origem, o Collector é a rede de segurança.
+  redaction:
+    allow_all_keys: true
+    blocked_key_patterns:
+      - '(?i).*(password|passwd|secret|token|authorization|cookie|api[_-]?key|set-cookie).*'
+      - '(?i).*(cpf|cnpj|e[_-]?mail|phone|telefone|card|cartao).*'
+    blocked_values:
+      - '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'       # e-mail
+      - '\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b'                      # CPF
+      - '\b(?:\d[ -]?){13,19}\b'                                # cartão
+      - 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'     # JWT
+      - '(?i)bearer\s+[A-Za-z0-9._~+/=-]+'
+    summary: info
+
+  # 3) o que a semconv marca como sensível e a casa não quer: remove, não mascara.
+  attributes/drop:
+    actions:
+      - { key: http.request.header.authorization, action: delete }
+      - { key: http.request.header.cookie, action: delete }
+      - { key: http.response.header.set-cookie, action: delete }
+      - { key: user.email, action: delete }
+
+  # 4) amostragem de TRACES por cauda: 100% de erro e de lenta, o resto por probabilidade.
+  #    Exige que todos os spans de um trace cheguem ao MESMO Collector (ver references/amostragem.md).
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    policies:
+      - name: erros-sempre
+        type: status_code
+        status_code: { status_codes: [ERROR] }
+      - name: lentas
+        type: latency
+        latency: { threshold_ms: 1000 }
+      - name: amostra-do-resto
+        type: probabilistic
+        probabilistic: { sampling_percentage: 10 }
+
+  # 5) batch por último: agrupa o que sobrou para reduzir chamadas ao backend.
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+exporters:
+  # Traces -> Tempo (OTLP gRPC). TLS obrigatório fora de localhost.
+  otlp/tempo:
+    endpoint: tempo.obs.interno:4317
+    tls:
+      ca_file: /etc/otel/tls/ca.pem
+    retry_on_failure: { enabled: true }
+    sending_queue: { enabled: true, queue_size: 5000 }
+  # Logs -> Loki (endpoint OTLP nativo do Loki 3.x).
+  otlphttp/loki:
+    endpoint: https://loki.obs.interno:3100/otlp
+    tls:
+      ca_file: /etc/otel/tls/ca.pem
+  # Métricas -> Mimir (ou Prometheus/VictoriaMetrics com receiver OTLP).
+  otlphttp/mimir:
+    endpoint: https://mimir.obs.interno:8080/otlp
+    tls:
+      ca_file: /etc/otel/tls/ca.pem
+    headers:
+      X-Scope-OrgID: ${env:OBS_TENANT}
+  # Diagnóstico local do próprio Collector (nunca dado de usuário em claro: redaction já rodou).
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      level: detailed
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, attributes/drop, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, batch]
+      exporters: [otlphttp/mimir]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, attributes/drop, batch]
+      exporters: [otlphttp/loki]

@@ -1,0 +1,168 @@
+# alertas-slo.rules.yaml — SLO de disponibilidade com alerta multi-window multi-burn-rate.
+# Exemplo: SLO 99,9% em 30 dias (error budget 0,1% = 0.001). Fonte do método: Google SRE Workbook,
+# "Alerting on SLOs" (cap. 5). Fatores de burn: 14.4 (1h+5m, consome 2% do budget em 1h),
+# 6 (6h+30m, 5%), 3 (1d+2h, 10%) e 1 (3d+6h, 10%) — os 2 primeiros PAGINAM, os 2 últimos abrem ticket.
+# Pré-requisito: SLI como recording rules (abaixo), sobre a métrica semconv http.server.request.duration
+# exportada ao Prometheus como http_server_request_duration_seconds_*. SEM label de alta cardinalidade:
+# agregamos por service e descartamos o resto.
+groups:
+  - name: sli-disponibilidade
+    interval: 30s
+    rules:
+      # razão de erro (5xx) por janela; a rota (http.route, baixa cardinalidade) NÃO entra no SLI global.
+      - record: service:http_errors:ratio_rate5m
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+      - record: service:http_errors:ratio_rate30m
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[30m]))
+      - record: service:http_errors:ratio_rate1h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[1h]))
+      - record: service:http_errors:ratio_rate2h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[2h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[2h]))
+      - record: service:http_errors:ratio_rate6h
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[6h]))
+      - record: service:http_errors:ratio_rate1d
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1d]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[1d]))
+      - record: service:http_errors:ratio_rate3d
+        expr: |
+          sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[3d]))
+          /
+          sum by (service_name) (rate(http_server_request_duration_seconds_count[3d]))
+
+  - name: slo-disponibilidade-burn-rate
+    rules:
+      # PÁGINA: queima 14.4x o budget; janela longa 1h confirma, curta 5m garante que ainda está queimando.
+      - alert: SLOBurnRateAltoPagina
+        expr: |
+          service:http_errors:ratio_rate1h > (14.4 * 0.001)
+          and
+          service:http_errors:ratio_rate5m > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: page
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 14.4x (1h e 5m)"
+          description: "Sintoma de usuário: erro 5xx acima de 1.44% nas duas janelas. Budget de 30d acaba em ~2 dias."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-alto"
+      # PÁGINA: 6x em 6h + 30m.
+      - alert: SLOBurnRateMedioPagina
+        expr: |
+          service:http_errors:ratio_rate6h > (6 * 0.001)
+          and
+          service:http_errors:ratio_rate30m > (6 * 0.001)
+        for: 5m
+        labels:
+          severity: page
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 6x (6h e 30m)"
+          description: "Erro 5xx acima de 0.6% sustentado. Budget de 30d acaba em ~5 dias."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-medio"
+      # TICKET: 3x em 1d + 2h.
+      - alert: SLOBurnRateLentoTicket
+        expr: |
+          service:http_errors:ratio_rate1d > (3 * 0.001)
+          and
+          service:http_errors:ratio_rate2h > (3 * 0.001)
+        for: 15m
+        labels:
+          severity: ticket
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} queima o error budget 3x (1d e 2h)"
+          description: "Degradação lenta: abrir ticket e priorizar confiabilidade antes que vire página."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-lento"
+      # TICKET: 1x em 3d + 6h (consumo no ritmo exato do budget: só avisa).
+      - alert: SLOBurnRateBaseTicket
+        expr: |
+          service:http_errors:ratio_rate3d > (1 * 0.001)
+          and
+          service:http_errors:ratio_rate6h > (1 * 0.001)
+        for: 30m
+        labels:
+          severity: ticket
+          slo: disponibilidade-99.9
+        annotations:
+          summary: "{{ $labels.service_name }} consome o budget no ritmo limite (3d e 6h)"
+          description: "Sem folga: qualquer incidente a mais estoura o SLO do período."
+          runbook_url: "https://docs.exemplo.interno/runbooks/slo-burn-rate-base"
+
+  - name: sintomas-de-usuario
+    rules:
+      # Readiness caindo tira instância do tráfego: sintoma que o usuário sente quando é o fleet inteiro.
+      - alert: ServicoSemInstanciaPronta
+        expr: sum by (service_name) (up{job=~".+"}) == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }} sem nenhuma instância respondendo"
+          runbook_url: "https://docs.exemplo.interno/runbooks/sem-instancia"
+
+  # Piso 28 (microserviço autônomo): fila de espera durável, DLQ e outbox. Métricas esperadas (metricas.md §8):
+  # queue_depth, queue_oldest_item_age_seconds, queue_dlq_depth, outbox_lag_seconds, todas por service_name e queue.
+  # `trace_lookup` diz como achar o trace_id do item parado: trace_id é atributo de LOG/exemplar, nunca label.
+  - name: fila-e-resiliencia
+    rules:
+      # Saturação: a fila só cresce (nada drena). Avisa antes do dado velho virar prejuízo.
+      - alert: FilaProfundidadeAlta
+        expr: max by (service_name, queue) (queue_depth) > 1000 and max by (service_name, queue) (deriv(queue_depth[15m])) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "{{ $labels.service_name }}/{{ $labels.queue }}: fila crescendo e acima de 1000 itens"
+          description: "Ajuste 1000 ao orçamento da fila. Consumidor parado, lento ou dependência fora."
+          trace_lookup: 'Loki: {service_name="{{ $labels.service_name }}"} | json | event="queue.enqueued" | queue="{{ $labels.queue }}" (trace_id no log; exemplar na métrica)'
+          runbook_url: "https://docs.exemplo.interno/runbooks/fila-profundidade"
+      # A métrica que importa: idade do item mais antigo (dado esperando há demais).
+      - alert: FilaItemMaisAntigoVelho
+        expr: max by (service_name, queue) (queue_oldest_item_age_seconds) > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }}/{{ $labels.queue }}: item mais antigo espera há mais de 15 min"
+          description: "Ajuste 900 s ao SLO de frescor. A cadeia está travada ou lenta; o dado ainda não foi perdido."
+          trace_lookup: 'Loki: {service_name="{{ $labels.service_name }}"} | json | event="queue.retry" | queue="{{ $labels.queue }}" (pegue o trace_id do item mais velho)'
+          runbook_url: "https://docs.exemplo.interno/runbooks/fila-item-antigo"
+      # DLQ > 0: mensagem envenenada exige humano; nunca é ruído.
+      - alert: DLQComItem
+        expr: max by (service_name, queue) (queue_dlq_depth) > 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }}/{{ $labels.queue }}: DLQ com item"
+          description: "Mensagem envenenada após N tentativas. Inspecione, corrija e reprocesse por operação do ops."
+          trace_lookup: 'Loki: {service_name="{{ $labels.service_name }}"} | json | event="dlq.enter" | queue="{{ $labels.queue }}" (trace_id e causa no log)'
+          runbook_url: "https://docs.exemplo.interno/runbooks/dlq"
+      # Outbox transacional: evento gravado e não publicado (ReBAC: privilégio sobrevive à revogação).
+      - alert: OutboxLagAlto
+        expr: max by (service_name) (outbox_lag_seconds) > 60
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }}: outbox atrasado mais de 60 s"
+          description: "Worker do outbox parado ou destino fora. Ajuste 60 s ao orçamento do contrato."
+          trace_lookup: 'Loki: {service_name="{{ $labels.service_name }}"} | json | event="outbox.publish_failed" (trace_id no log)'
+          runbook_url: "https://docs.exemplo.interno/runbooks/outbox-lag"

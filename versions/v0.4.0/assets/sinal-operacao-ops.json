@@ -1,0 +1,13 @@
+{
+  "versao": 1,
+  "regra": "A IA le telemetria somente por operacao nomeada do ops (piso 24); nunca acesso direto a Loki/Prometheus/VPS.",
+  "sinais": [
+    { "sinal": "logs",    "operacao": "ops logs",     "argumentos": ["servico", "--trace-id", "--level", "--since", "--tail", "--json"], "saida": "jsonl" },
+    { "sinal": "traces",  "operacao": "ops traces get", "argumentos": ["trace_id", "--json"], "saida": "json" },
+    { "sinal": "metricas", "operacao": "ops metrics",  "argumentos": ["servico", "--name", "--range", "--json"], "saida": "json" },
+    { "sinal": "alertas", "operacao": "ops alerts",   "argumentos": ["--state", "--json"], "saida": "json" },
+    { "sinal": "saude",   "operacao": "ops health",   "argumentos": ["servico", "--json"], "saida": "json" },
+    { "sinal": "filas",   "operacao": "ops queues",   "argumentos": ["servico", "--json"], "saida": "json" },
+    { "sinal": "versao",  "operacao": "ops versions", "argumentos": ["--json"], "saida": "json" }
+  ]
+}
